@@ -5,7 +5,8 @@ include(FetchContent)
 
 FetchContent_Declare(
   wamr
-  URL https://github.com/bytecodealliance/wasm-micro-runtime/archive/refs/heads/main.tar.gz
+  URL https://github.com/bytecodealliance/wasm-micro-runtime/archive/refs/tags/WAMR-2.4.3.tar.gz
+  DOWNLOAD_EXTRACT_TIMESTAMP TRUE
 )
 FetchContent_GetProperties(wamr)
 if(NOT wamr_POPULATED)
