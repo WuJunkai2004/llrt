@@ -65,6 +65,7 @@ base = [
   "tty",
   "url",
   "util",
+  "webassembly",
   "zlib",
 ]
 
@@ -109,6 +110,7 @@ tls = ["llrt_tls"]
 tty = ["llrt_tty"]
 url = ["llrt_url"]
 util = ["llrt_util"]
+webassembly = ["llrt_webassembly"]
 zlib = ["llrt_zlib"]
 
 [dependencies]
@@ -153,6 +155,7 @@ llrt_tty = { version = "0.8.1-beta", path = "../modules/llrt_tty", optional = tr
 llrt_url = { version = "0.8.1-beta", path = "../modules/llrt_url", optional = true }
 openssl = { version = "0.10", optional = true }
 llrt_util = { version = "0.8.1-beta", path = "../modules/llrt_util", optional = true }
+llrt_webassembly = { version = "0.8.1-beta", path = "../modules/llrt_webassembly", optional = true }
 llrt_zlib = { version = "0.8.1-beta", path = "../modules/llrt_zlib", optional = true }
 
 [dev-dependencies]

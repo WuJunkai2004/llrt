@@ -1,0 +1,17 @@
+[package]
+name = "llrt_webassembly"
+description = "LLRT global WebAssembly bridge module"
+version = "0.8.1-beta"
+edition = "2021"
+license = "Apache-2.0"
+repository = "https://github.com/awslabs/llrt"
+readme = "README.md"
+
+[lib]
+name = "llrt_webassembly"
+path = "src/lib.rs"
+
+[dependencies]
+libloading = { version = "0.8", default-features = false }
+llrt_utils = { version = "0.8.1-beta", path = "../../libs/llrt_utils" }
+rquickjs = { version = "0.11", default-features = false }

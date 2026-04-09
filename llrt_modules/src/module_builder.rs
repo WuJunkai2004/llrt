@@ -185,6 +185,10 @@ impl Default for ModuleBuilder {
                 .with_global(crate::modules::util::init)
                 .with_module(crate::modules::util::UtilModule);
         }
+        #[cfg(feature = "webassembly")]
+        {
+            builder = builder.with_global(crate::modules::webassembly::init);
+        }
         #[cfg(feature = "zlib")]
         {
             builder = builder.with_module(crate::modules::zlib::ZlibModule);

@@ -69,6 +69,8 @@ mod modules {
     pub use llrt_url as url;
     #[cfg(feature = "util")]
     pub use llrt_util as util;
+    #[cfg(feature = "webassembly")]
+    pub use llrt_webassembly as webassembly;
     #[cfg(feature = "zlib")]
     pub use llrt_zlib as zlib;
 }

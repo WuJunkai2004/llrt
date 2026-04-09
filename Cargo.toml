@@ -2,6 +2,7 @@
 resolver = "2"
 
 members = [
+  "libs/llrt_webassembly_runtime",
   "libs/llrt_build",
   "libs/llrt_compression",
   "libs/llrt_context",
@@ -39,6 +40,7 @@ members = [
   "modules/llrt_tty",
   "modules/llrt_url",
   "modules/llrt_util",
+  "modules/llrt_webassembly",
   "modules/llrt_zlib",
   "llrt_modules",
   "llrt_core",
