@@ -2,23 +2,22 @@
 // SPDX-License-Identifier: Apache-2.0
 use std::{cmp::Ordering, str::FromStr};
 
-use jiff::{Span, Timestamp, Zoned};
+use jiff::{Timestamp, Zoned};
 use llrt_utils::result::ResultExt;
-use rquickjs::Class;
 use rquickjs::{
-    atom::PredefinedAtom, class::Trace, Ctx, Exception, JsLifetime, Object, Result, Value,
+    atom::PredefinedAtom, class::Trace, prelude::Opt, BigInt, Class, Ctx, Exception, JsLifetime,
+    Result, Value,
 };
 
 use crate::duration::Duration;
-use crate::utils::round::timestamp::TimestampRoundOption;
-use crate::utils::{span::SpanExt, timestamp::TimestampExt};
+use crate::utils::timestamp_round::TimestampRoundOption;
 use crate::zoned_date_time::ZonedDateTime;
 
 use super::extract_bigint_or_number;
 
 #[derive(Clone, JsLifetime, Trace)]
 #[rquickjs::class]
-pub struct Instant {
+pub(crate) struct Instant {
     #[qjs(skip_trace)]
     inner: Timestamp,
 }
@@ -45,7 +44,6 @@ impl Instant {
             if let Some(cls) = Class::<Self>::from_object(obj) {
                 return Ok(cls.borrow().clone());
             }
-            return Self::from_object(&ctx, obj);
         }
 
         let str = info
@@ -58,18 +56,19 @@ impl Instant {
 
     #[qjs(static)]
     fn from_epoch_milliseconds(ctx: Ctx<'_>, ms: f64) -> Result<Self> {
-        let nanos = (ms * 1_000_000.0) as i128;
-        Self::from_nanosecond(&ctx, nanos)
+        let ns = (ms * 1_000_000.0) as i128;
+        Self::from_nanosecond(&ctx, ns)
     }
 
     #[qjs(static)]
-    fn from_epoch_nanoseconds(ctx: Ctx<'_>, nanos: Value<'_>) -> Result<Self> {
-        let nanos = extract_bigint_or_number(&ctx, &nanos)?;
-        Self::from_nanosecond(&ctx, nanos)
+    fn from_epoch_nanoseconds(ctx: Ctx<'_>, ns: Value<'_>) -> Result<Self> {
+        let ns = extract_bigint_or_number(&ctx, &ns)?;
+        Self::from_nanosecond(&ctx, ns)
     }
 
     fn add(&self, ctx: Ctx<'_>, duration: Value<'_>) -> Result<Self> {
-        let span = Span::from_value(&ctx, &duration)?;
+        let duration = Duration::from_value(&ctx, &duration)?;
+        let span = duration.into_inner();
         let ts = self.inner.checked_add(span).or_throw_range(&ctx, "")?;
         Ok(Self { inner: ts })
     }
@@ -86,11 +85,12 @@ impl Instant {
     }
 
     fn since(&self, other: Self) -> Duration {
-        Duration::from_span(self.inner - other.inner)
+        Duration::new_object(self.inner - other.inner)
     }
 
     fn subtract(&self, ctx: Ctx<'_>, duration: Value<'_>) -> Result<Self> {
-        let span = Span::from_value(&ctx, &duration)?;
+        let duration = Duration::from_value(&ctx, &duration)?;
+        let span = duration.into_inner();
         let ts = self.inner.checked_sub(span).or_throw_range(&ctx, "")?;
         Ok(Self { inner: ts })
     }
@@ -108,12 +108,13 @@ impl Instant {
     }
 
     #[qjs(rename = "toZonedDateTimeISO")]
-    fn to_zoned_dt_iso(&self, ctx: Ctx<'_>, timezone: Option<String>) -> Result<ZonedDateTime> {
-        ZonedDateTime::from_timestamp(&ctx, &self.inner, &timezone)
+    fn to_zoned_dt_iso(&self, ctx: Ctx<'_>, timezone: Opt<String>) -> Result<ZonedDateTime> {
+        let tz = timezone.as_deref().unwrap_or("UTC");
+        ZonedDateTime::from_ts_tz(&ctx, &self.inner, tz)
     }
 
     fn until(&self, other: Self) -> Duration {
-        Duration::from_span(other.inner - self.inner)
+        Duration::new_object(other.inner - self.inner)
     }
 
     fn value_of(&self, ctx: Ctx<'_>) -> Result<()> {
@@ -129,8 +130,10 @@ impl Instant {
     }
 
     #[qjs(get)]
-    fn epoch_nanoseconds(&self) -> f64 {
-        self.inner.as_nanosecond() as f64
+    fn epoch_nanoseconds<'js>(&self, ctx: Ctx<'js>) -> Result<BigInt<'js>> {
+        let ns = self.inner.as_nanosecond();
+        let ns = ns.try_into().or_throw_range(&ctx, "")?;
+        BigInt::from_i64(ctx, ns)
     }
 
     #[qjs(get, rename = PredefinedAtom::SymbolToStringTag)]
@@ -140,11 +143,6 @@ impl Instant {
 }
 
 impl Instant {
-    pub fn from_zoned(zoned: &Zoned) -> Self {
-        let ts = zoned.timestamp();
-        Self { inner: ts }
-    }
-
     fn from_nanosecond(ctx: &Ctx<'_>, ns: i128) -> Result<Self> {
         let ts = Timestamp::from_nanosecond(ns).or_throw_range(ctx, "")?;
         Ok(Self { inner: ts })
@@ -155,17 +153,13 @@ impl Instant {
         Ok(Self { inner: ts })
     }
 
-    fn from_object(ctx: &Ctx<'_>, object: &Object<'_>) -> Result<Self> {
-        let ts = Timestamp::from_object(ctx, object)?;
-        Ok(Self { inner: ts })
-    }
-
-    pub fn now() -> Self {
-        let ts = Timestamp::now();
+    pub(crate) fn from_zoned(zoned: &Zoned) -> Self {
+        let ts = zoned.timestamp();
         Self { inner: ts }
     }
 
-    pub fn into_inner(&self) -> Timestamp {
-        self.inner
+    pub(crate) fn now() -> Self {
+        let ts = Timestamp::now();
+        Self { inner: ts }
     }
 }

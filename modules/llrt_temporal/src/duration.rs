@@ -1,18 +1,25 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
-use std::cmp::Ordering;
+use std::{cmp::Ordering, str::FromStr};
 
-use jiff::Span;
+use jiff::{Span, SpanCompare, SpanRound, SpanTotal};
 use llrt_utils::result::ResultExt;
 use rquickjs::{
-    atom::PredefinedAtom, class::Trace, Class, Ctx, Exception, JsLifetime, Object, Result, Value,
+    atom::PredefinedAtom,
+    class::Trace,
+    prelude::{Opt, Rest},
+    Class, Ctx, Exception, JsLifetime, Object, Result, Value,
 };
 
+use crate::utils::date::fill_duration_from_iter as fill_date_from_iter;
 use crate::utils::span::SpanExt;
+use crate::utils::span_round::SpanRoundExt;
+use crate::utils::span_total::SpanTotalExt;
+use crate::utils::time::fill_duration_from_iter as fill_time_from_iter;
 
 #[derive(Clone, JsLifetime, Trace)]
 #[rquickjs::class]
-pub struct Duration {
+pub(crate) struct Duration {
     #[qjs(skip_trace)]
     inner: Span,
 }
@@ -20,13 +27,15 @@ pub struct Duration {
 #[rquickjs::methods(rename_all = "camelCase")]
 impl Duration {
     #[qjs(constructor)]
-    fn new() -> Result<Self> {
-        Ok(Self { inner: Span::new() })
+    fn new<'js>(ctx: Ctx<'js>, args: Rest<Value<'js>>) -> Result<Self> {
+        let obj = Self::fill_object(&ctx, &args)?;
+        Self::from_object(&ctx, &obj)
     }
 
     #[qjs(static)]
-    fn compare(ctx: Ctx<'_>, duration1: Self, duration2: Self) -> Result<i8> {
-        match duration1.inner.compare(duration2.inner).or_throw(&ctx)? {
+    fn compare(ctx: Ctx<'_>, duration1: Self, duration2: Self, opt: Opt<Value<'_>>) -> Result<i8> {
+        let sc = Self::into_span_compare(&duration2.inner, &opt);
+        match duration1.inner.compare(sc).or_throw_range(&ctx, "")? {
             Ordering::Less => Ok(-1),
             Ordering::Equal => Ok(0),
             Ordering::Greater => Ok(1),
@@ -35,19 +44,7 @@ impl Duration {
 
     #[qjs(static)]
     fn from(ctx: Ctx<'_>, info: Value<'_>) -> Result<Self> {
-        if let Some(obj) = info.as_object() {
-            if let Some(cls) = Class::<Self>::from_object(obj) {
-                return Ok(cls.borrow().clone());
-            }
-            return Self::from_object(&ctx, obj);
-        }
-
-        let str = info
-            .as_string()
-            .and_then(|s| s.to_string().ok())
-            .or_throw_type(&ctx, "Cannot convert value to string")?;
-
-        Self::from_str(&ctx, &str)
+        Self::from_value(&ctx, &info)
     }
 
     fn abs(&self) -> Self {
@@ -56,7 +53,8 @@ impl Duration {
     }
 
     fn add(&self, ctx: Ctx<'_>, other: Value<'_>) -> Result<Self> {
-        let span = Span::from_value(&ctx, &other)?;
+        let duration = Self::from_value(&ctx, &other)?;
+        let span = duration.into_inner();
         let span = self.inner.checked_add(span).or_throw_range(&ctx, "")?;
         Ok(Self { inner: span })
     }
@@ -66,8 +64,15 @@ impl Duration {
         Self { inner: span }
     }
 
+    fn round(&self, ctx: Ctx<'_>, options: Value<'_>) -> Result<Self> {
+        let round = SpanRound::from_value(&ctx, &options)?;
+        let span = self.inner.round(round).or_throw_range(&ctx, "")?;
+        Ok(Self { inner: span })
+    }
+
     fn subtract(&self, ctx: Ctx<'_>, other: Value<'_>) -> Result<Self> {
-        let span = Span::from_value(&ctx, &other)?;
+        let duration = Self::from_value(&ctx, &other)?;
+        let span = duration.into_inner();
         let span = self.inner.checked_sub(span).or_throw_range(&ctx, "")?;
         Ok(Self { inner: span })
     }
@@ -84,6 +89,12 @@ impl Duration {
         self.inner.to_string()
     }
 
+    fn total(&self, ctx: Ctx<'_>, options: Value<'_>) -> Result<f64> {
+        let total = SpanTotal::from_value(&ctx, &options)?;
+        let num = self.inner.total(total).or_throw_range(&ctx, "")?;
+        Ok(num)
+    }
+
     fn value_of(&self, ctx: Ctx<'_>) -> Result<()> {
         Err(Exception::throw_type(
             &ctx,
@@ -92,7 +103,7 @@ impl Duration {
     }
 
     fn with(&self, ctx: Ctx<'_>, info: Value<'_>) -> Result<Self> {
-        let span = self.inner.with(&ctx, &info)?;
+        let span = self.inner.span_with(&ctx, &info)?;
         Ok(Self { inner: span })
     }
 
@@ -163,17 +174,45 @@ impl Duration {
 }
 
 impl Duration {
-    fn from_str(ctx: &Ctx<'_>, str: &str) -> Result<Self> {
-        let span = str.parse().or_throw_range(ctx, "")?;
+    fn fill_object<'js>(ctx: &Ctx<'js>, args: &Rest<Value<'js>>) -> Result<Object<'js>> {
+        let obj = Object::new(ctx.clone())?;
+        let mut iter = args.0.iter().cloned();
+        fill_date_from_iter(&obj, &mut iter)?;
+        fill_time_from_iter(&obj, &mut iter)?;
+        Ok(obj)
+    }
+
+    fn from_object(ctx: &Ctx<'_>, obj: &Object<'_>) -> Result<Self> {
+        let span = Span::from_object(ctx, obj)?;
         Ok(Self { inner: span })
     }
 
-    fn from_object(ctx: &Ctx<'_>, object: &Object<'_>) -> Result<Self> {
-        let span = Span::from_object(ctx, object)?;
+    pub(crate) fn from_value(ctx: &Ctx<'_>, value: &Value<'_>) -> Result<Self> {
+        if let Some(obj) = value.as_object() {
+            if let Some(cls) = Class::<Self>::from_object(obj) {
+                return Ok(cls.borrow().clone());
+            }
+            return Self::from_object(ctx, obj);
+        }
+
+        let str = value
+            .as_string()
+            .and_then(|s| s.to_string().ok())
+            .or_throw_type(ctx, "Cannot convert value to string")?;
+
+        let span = Span::from_str(&str).or_throw_range(ctx, "")?;
         Ok(Self { inner: span })
     }
 
-    pub fn from_span(span: Span) -> Self {
+    pub(crate) fn into_inner(self) -> Span {
+        self.inner
+    }
+
+    fn into_span_compare<'a>(span: &Span, value: &Opt<Value<'a>>) -> SpanCompare<'a> {
+        Span::into_span_compare(span, value)
+    }
+
+    pub(crate) fn new_object(span: Span) -> Self {
         Self { inner: span }
     }
 }
