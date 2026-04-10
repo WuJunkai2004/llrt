@@ -5,8 +5,7 @@ include(FetchContent)
 
 FetchContent_Declare(
   wamr
-  URL https://github.com/bytecodealliance/wasm-micro-runtime/archive/refs/tags/WAMR-2.4.3.tar.gz
-  DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+  URL https://github.com/bytecodealliance/wasm-micro-runtime/archive/refs/tags/WAMR-2.4.4.tar.gz
 )
 FetchContent_GetProperties(wamr)
 if(NOT wamr_POPULATED)
@@ -28,5 +27,4 @@ set(WAMR_BUILD_SIMD 0)
 include(${WAMR_ROOT_DIR}/build-scripts/runtime_lib.cmake)
 
 add_library(vmlib STATIC ${WAMR_RUNTIME_LIB_SOURCE})
-add_library(iwasm SHARED ${WAMR_RUNTIME_LIB_SOURCE})
-target_link_libraries(iwasm PRIVATE m dl pthread)
+target_link_libraries(vmlib PRIVATE m dl pthread)

@@ -10,7 +10,6 @@ fn main() {
         .build();
 
     println!("cargo:rustc-link-search=native={}", dst.join("build").display());
-    println!("cargo:rustc-link-lib=dylib=iwasm");
     println!("cargo:rustc-link-lib=static=vmlib");
     println!("cargo:rustc-link-lib=dylib=dl");
     println!("cargo:rustc-link-lib=dylib=pthread");
