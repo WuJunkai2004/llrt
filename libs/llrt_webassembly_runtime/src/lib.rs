@@ -82,6 +82,10 @@ fn validate_inner(data_ptr: *const u8, data_len: usize) -> bool {
     true
 }
 
+fn compile_inner(data_ptr: *const u8, data_len: usize) -> bool {
+    validate_inner(data_ptr, data_len)
+}
+
 fn instantiate_inner(data_ptr: *const u8, data_len: usize) -> bool {
     if !ensure_runtime_init() {
         return false;
@@ -120,6 +124,14 @@ fn instantiate_inner(data_ptr: *const u8, data_len: usize) -> bool {
     true
 }
 
+fn compile_streaming_inner(data_ptr: *const u8, data_len: usize) -> bool {
+    compile_inner(data_ptr, data_len)
+}
+
+fn instantiate_streaming_inner(data_ptr: *const u8, data_len: usize) -> bool {
+    instantiate_inner(data_ptr, data_len)
+}
+
 #[no_mangle]
 pub extern "C" fn llrt_wasm_validate(data_ptr: *const u8, data_len: usize) -> i32 {
     i32::from(validate_inner(data_ptr, data_len))
@@ -127,7 +139,7 @@ pub extern "C" fn llrt_wasm_validate(data_ptr: *const u8, data_len: usize) -> i3
 
 #[no_mangle]
 pub extern "C" fn llrt_wasm_compile(data_ptr: *const u8, data_len: usize) -> i32 {
-    i32::from(validate_inner(data_ptr, data_len))
+    i32::from(compile_inner(data_ptr, data_len))
 }
 
 #[no_mangle]
@@ -137,10 +149,72 @@ pub extern "C" fn llrt_wasm_instantiate(data_ptr: *const u8, data_len: usize) ->
 
 #[no_mangle]
 pub extern "C" fn llrt_wasm_compile_streaming(data_ptr: *const u8, data_len: usize) -> i32 {
-    i32::from(validate_inner(data_ptr, data_len))
+    i32::from(compile_streaming_inner(data_ptr, data_len))
 }
 
 #[no_mangle]
 pub extern "C" fn llrt_wasm_instantiate_streaming(data_ptr: *const u8, data_len: usize) -> i32 {
-    i32::from(instantiate_inner(data_ptr, data_len))
+    i32::from(instantiate_streaming_inner(data_ptr, data_len))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const VALID_EMPTY_WASM: [u8; 8] = [0x00, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00];
+    const INVALID_WASM: [u8; 4] = [0x00, 0x61, 0x73, 0x00];
+
+    #[test]
+    fn validate_symbol_handles_valid_and_invalid_inputs() {
+        assert_eq!(
+            llrt_wasm_validate(VALID_EMPTY_WASM.as_ptr(), VALID_EMPTY_WASM.len()),
+            1
+        );
+        assert_eq!(llrt_wasm_validate(INVALID_WASM.as_ptr(), INVALID_WASM.len()), 0);
+    }
+
+    #[test]
+    fn compile_symbol_handles_valid_and_invalid_inputs() {
+        assert_eq!(
+            llrt_wasm_compile(VALID_EMPTY_WASM.as_ptr(), VALID_EMPTY_WASM.len()),
+            1
+        );
+        assert_eq!(llrt_wasm_compile(INVALID_WASM.as_ptr(), INVALID_WASM.len()), 0);
+    }
+
+    #[test]
+    fn instantiate_symbol_handles_valid_and_invalid_inputs() {
+        assert_eq!(
+            llrt_wasm_instantiate(VALID_EMPTY_WASM.as_ptr(), VALID_EMPTY_WASM.len()),
+            1
+        );
+        assert_eq!(
+            llrt_wasm_instantiate(INVALID_WASM.as_ptr(), INVALID_WASM.len()),
+            0
+        );
+    }
+
+    #[test]
+    fn compile_streaming_symbol_handles_valid_and_invalid_inputs() {
+        assert_eq!(
+            llrt_wasm_compile_streaming(VALID_EMPTY_WASM.as_ptr(), VALID_EMPTY_WASM.len()),
+            1
+        );
+        assert_eq!(
+            llrt_wasm_compile_streaming(INVALID_WASM.as_ptr(), INVALID_WASM.len()),
+            0
+        );
+    }
+
+    #[test]
+    fn instantiate_streaming_symbol_handles_valid_and_invalid_inputs() {
+        assert_eq!(
+            llrt_wasm_instantiate_streaming(VALID_EMPTY_WASM.as_ptr(), VALID_EMPTY_WASM.len()),
+            1
+        );
+        assert_eq!(
+            llrt_wasm_instantiate_streaming(INVALID_WASM.as_ptr(), INVALID_WASM.len()),
+            0
+        );
+    }
 }
