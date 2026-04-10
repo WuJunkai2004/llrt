@@ -2033,6 +2033,7 @@ dependencies = [
  "llrt_url",
  "llrt_util",
  "llrt_utils",
+ "llrt_webassembly",
  "llrt_zlib",
  "once_cell",
  "openssl",
@@ -2271,6 +2272,22 @@ dependencies = [
  "tokio",
  "tracing",
  "windows-sys 0.61.2",
+]
+
+[[package]]
+name = "llrt_webassembly"
+version = "0.8.1-beta"
+dependencies = [
+ "libloading",
+ "llrt_utils",
+ "rquickjs",
+]
+
+[[package]]
+name = "llrt_webassembly_runtime"
+version = "0.8.1-beta"
+dependencies = [
+ "cmake",
 ]
 
 [[package]]

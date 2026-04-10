@@ -103,6 +103,10 @@ $(foreach target,$(RELEASE_TARGETS),$(eval $(call release_template,$(target),-no
 build: js
 	cargo $(BUILD_ARG) --target $(CURRENT_TARGET)
 
+webassembly-runtime:
+	cargo build -r -p llrt_webassembly_runtime
+	cp ./target/release/libllrt_WebAssembly.so ./llrt-WebAssembly.so
+
 ifeq ($(DETECTED_OS),windows)
 stdlib:
 	rustup toolchain install $(RUST_VERSION) --target $(TARGET_windows_x86_64)
@@ -279,4 +283,4 @@ check-crates:
 	  cargo check -p "$$crate"; \
 	done
 
-.PHONY: libs check check-all check-crates libs-arm64 libs-x64 toolchain clean-js release-linux release-darwin release-windows lambda stdlib stdlib-x64 stdlib-arm64 test test-ci run js run-release build release clean flame deploy
+.PHONY: libs check check-all check-crates libs-arm64 libs-x64 toolchain clean-js release-linux release-darwin release-windows lambda stdlib stdlib-x64 stdlib-arm64 test test-ci run js run-release build webassembly-runtime release clean flame deploy

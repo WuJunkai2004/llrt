@@ -1,0 +1,15 @@
+[package]
+name = "llrt_webassembly_runtime"
+description = "LLRT WebAssembly runtime bridge based on wasm-micro-runtime"
+version = "0.8.1-beta"
+edition = "2021"
+license = "Apache-2.0"
+repository = "https://github.com/awslabs/llrt"
+
+[lib]
+name = "llrt_WebAssembly"
+path = "src/lib.rs"
+crate-type = ["cdylib"]
+
+[build-dependencies]
+cmake = "0.1"
