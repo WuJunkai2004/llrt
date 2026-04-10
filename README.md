@@ -99,6 +99,18 @@ To run tests, execute the `llrt test` command. LLRT scans the current directory 
 
 The test runner also has support for filters. Using filters is as simple as adding additional command line arguments, i.e: `llrt test crypto` will only run tests that match the filename containing `crypto`.
 
+### WebAssembly bridge (Linux PoC)
+
+LLRT now includes a Linux proof-of-concept WebAssembly bridge backed by [wasm-micro-runtime](https://github.com/bytecodealliance/wasm-micro-runtime), exported as `llrt-WebAssembly.so`.
+
+Build the shared bridge library:
+
+```shell
+make webassembly-runtime
+```
+
+If needed, set `LLRT_WEBASSEMBLY_LIB_PATH` to point to the generated `.so` file.
+
 ## Compatibility matrix
 
 > [!NOTE]
@@ -172,8 +184,8 @@ The test runner also has support for filters. Using filters is as simple as addi
 | STREAMS                                                           | ✔︎⚠️  |
 | URL                                                               | ✔︎    |
 | URLPATTERN                                                        | ✘⏱   |
-| WASM-JS-API-2                                                     | ✘    |
-| WASM-WEB-API-2                                                    | ✘    |
+| WASM-JS-API-2                                                     | ✔︎⚠️  |
+| WASM-WEB-API-2                                                    | ✔︎⚠️  |
 | WEBCRYPTO                                                         | ✔︎⚠️  |
 | WEBIDL                                                            | ✔︎⚠️  |
 | XHR                                                               | ✔︎⚠️  |
