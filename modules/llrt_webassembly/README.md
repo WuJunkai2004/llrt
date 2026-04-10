@@ -15,6 +15,7 @@ By default, LLRT resolves the runtime bridge from one of:
 - `./llrt-WebAssembly.so`
 - `llrt-WebAssembly.so`
 - `libllrt_WebAssembly.so`
+- `libllrt_webassembly.so`
 
 You can also override the path with:
 
