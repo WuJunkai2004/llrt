@@ -792,6 +792,16 @@ export function print(value: any): void;
 
 [globalThis](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/globalThis)
 
+## WASM-JS-API-2
+
+[WebAssembly](https://developer.mozilla.org/en-US/docs/WebAssembly/JavaScript_interface)
+
+- `WebAssembly.compile(source)`
+- `WebAssembly.validate(source)`
+- `WebAssembly.instantiate(source)`
+- `WebAssembly.compileStreaming(source)`
+- `WebAssembly.instantiateStreaming(source)`
+
 ## ENCODING
 
 [TextDecoder](https://developer.mozilla.org/en-US/docs/Web/API/TextDecoder)
