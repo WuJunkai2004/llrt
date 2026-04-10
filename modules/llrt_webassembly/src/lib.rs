@@ -1,6 +1,7 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 use std::env;
+use std::sync::OnceLock;
 
 use libloading::{Library, Symbol};
 use llrt_utils::bytes::ObjectBytes;
@@ -11,6 +12,9 @@ type WasmBridgeFn = extern "C" fn(*const u8, usize) -> i32;
 const LIB_PATH_ENV: &str = "LLRT_WEBASSEMBLY_LIB_PATH";
 const DEFAULT_LIB_NAME: &str = "llrt-WebAssembly.so";
 const DEFAULT_FALLBACK_LIB_NAME: &str = "libllrt_WebAssembly.so";
+const DEFAULT_SNAKE_FALLBACK_LIB_NAME: &str = "libllrt_webassembly.so";
+
+static BRIDGE_LIBRARY: OnceLock<std::result::Result<Library, String>> = OnceLock::new();
 
 fn resolve_library_paths() -> Vec<String> {
     let mut paths = Vec::with_capacity(4);
@@ -22,7 +26,29 @@ fn resolve_library_paths() -> Vec<String> {
     paths.push(format!("./{DEFAULT_LIB_NAME}"));
     paths.push(DEFAULT_LIB_NAME.to_string());
     paths.push(DEFAULT_FALLBACK_LIB_NAME.to_string());
+    paths.push(DEFAULT_SNAKE_FALLBACK_LIB_NAME.to_string());
     paths
+}
+
+fn load_bridge_library() -> std::result::Result<&'static Library, String> {
+    let loaded = BRIDGE_LIBRARY.get_or_init(|| {
+        let mut last_error = String::new();
+
+        for path in resolve_library_paths() {
+            // SAFETY: Path is controlled by runtime configuration and used only for loading shared library.
+            match unsafe { Library::new(&path) } {
+                Ok(lib) => return Ok(lib),
+                Err(err) => last_error = err.to_string(),
+            }
+        }
+
+        Err(last_error)
+    });
+
+    match loaded {
+        Ok(lib) => Ok(lib),
+        Err(err) => Err(err.clone()),
+    }
 }
 
 fn call_bridge<'js>(
@@ -31,35 +57,19 @@ fn call_bridge<'js>(
     symbol_name: &'static [u8],
     operation: &str,
 ) -> Result<bool> {
-    let mut last_error = String::new();
+    let library = load_bridge_library()
+        .map_err(|err| Exception::throw_message(ctx, &format!("Failed to load bridge: {err}")))?;
 
-    for path in resolve_library_paths() {
-        // SAFETY: Path is controlled by runtime configuration and used only for loading shared library.
-        let library = match unsafe { Library::new(&path) } {
-            Ok(lib) => lib,
-            Err(err) => {
-                last_error = err.to_string();
-                continue;
-            },
-        };
+    // SAFETY: Symbol is resolved from a process-lifetime loaded shared library and invoked immediately.
+    let symbol: Symbol<WasmBridgeFn> = unsafe { library.get(symbol_name) }.map_err(|err| {
+        Exception::throw_message(
+            ctx,
+            &format!("Failed to resolve WebAssembly {operation} symbol: {err}"),
+        )
+    })?;
 
-        // SAFETY: Symbol is resolved from the just-opened library and invoked immediately.
-        let symbol: Symbol<WasmBridgeFn> = match unsafe { library.get(symbol_name) } {
-            Ok(sym) => sym,
-            Err(err) => {
-                last_error = err.to_string();
-                continue;
-            },
-        };
-
-        let status = symbol(bytes.as_ptr(), bytes.len());
-        return Ok(status == 1);
-    }
-
-    Err(Exception::throw_message(
-        ctx,
-        &format!("Failed to load {operation} bridge from {DEFAULT_LIB_NAME}: {last_error}"),
-    ))
+    let status = symbol(bytes.as_ptr(), bytes.len());
+    Ok(status == 1)
 }
 
 fn compile_like<'js>(
